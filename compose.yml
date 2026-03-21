@@ -7,40 +7,53 @@ services:
       POSTGRES_PASSWORD: ${DATABASE__POSTGRES_PASSWORD}
       PGDATA: "/var/lib/postgresql/data/pgdata"
       TZ: "Europe/Moscow"
-    env_file: .env
     restart: "unless-stopped"
     volumes:
-      - tg-assistan-data:/var/lib/postgresql/data
+      - tg-assistant-data:/var/lib/postgresql/data
     deploy:
       resources:
         limits:
           cpus: '1'
           memory: 4G
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DATABASE__POSTGRES_USER} -d ${DATABASE__POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   redis:
     image: redis:7.4.2-alpine3.21
     restart: "unless-stopped"
-    volumes: 
+    volumes:
       - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   reminder:
-    build: 
+    build:
+      context: .
       dockerfile: scheduler.dockerfile
     command: sh ./schedule_entrypoint.sh
     env_file: .env
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
     restart: "unless-stopped"
 
-  tg_assisnant:
-    build: 
+  tg_assistant:
+    build:
+      context: .
       dockerfile: bot.dockerfile
     command: sh ./entrypoint.sh
     env_file: .env
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     restart: "unless-stopped"
 
 volumes:
-  tg-assistan-data:
+  tg-assistant-data:
   redis-data:

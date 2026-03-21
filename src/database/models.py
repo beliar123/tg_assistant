@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import DateTime, ForeignKey, MetaData, Numeric, String, Text
+from sqlalchemy import DateTime, ForeignKey, MetaData, String, Text
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import (
     DeclarativeBase,
@@ -49,34 +49,7 @@ class User(BaseDbModel):
     name: Mapped[str] = mapped_column(String(32))
     lastname: Mapped[str | None] = mapped_column(String(32))
     is_active: Mapped[bool] = mapped_column(default=True)
-    expenses: Mapped[list["Expense"]] = relationship(back_populates="user")
-    assets: Mapped[list["Assets"]] = relationship(back_populates="user")
     events: Mapped[list["Event"]] = relationship(back_populates="user")
-
-
-class Expense(BaseDbModel):
-    amount: Mapped[float] = mapped_column(Numeric(10, 2))
-    description: Mapped[str | None] = mapped_column(Text)
-    user_id: Mapped[int] = mapped_column(ForeignKey("user.id"))
-    user: Mapped["User"] = relationship(back_populates="expenses")
-    category_id: Mapped[int] = mapped_column(ForeignKey("category.id"))
-    category: Mapped["Category"] = relationship(back_populates="expenses")
-
-
-class Category(BaseDbModel):
-    codename: Mapped[str] = mapped_column(String(32), unique=True)
-    name: Mapped[str] = mapped_column(String(32))
-    aliases: Mapped[list[str]]
-    is_base_expense: Mapped[bool] = mapped_column(default=False)
-    expenses: Mapped[list["Expense"]] = relationship(back_populates="category")
-
-
-class Assets(BaseDbModel):
-    codename: Mapped[str]
-    amount: Mapped[int]
-    name: Mapped[str] = mapped_column(String(32))
-    user_id: Mapped[int] = mapped_column(ForeignKey("user.id"))
-    user: Mapped["User"] = relationship(back_populates="assets")
 
 
 class Event(BaseDbModel):

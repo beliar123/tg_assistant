@@ -1,31 +1,17 @@
 import logging
 
 from src.core.unitofwork import get_uow
-from src.database.models import Event, User
+from src.database.models import Event
 from src.reminders.schemes import EventCreateScheme, EventRepeatInterval, EventScheme
 from src.reminders.utils import parse_date_time
 
 logger = logging.getLogger(__name__)
 
 
-async def add_event_by_tg(
-    event: EventCreateScheme,
-    user_telegram_id: str,
-    chat_id: str,
-    firstname: str,
-    lastname: str | None,
-) -> EventScheme:
+async def add_event(event: EventCreateScheme, user_id: int) -> EventScheme:
     async with get_uow() as uow:
-        user = User(
-            telegram_id=user_telegram_id,
-            chat_id=chat_id,
-            name=firstname,
-            lastname=lastname,
-        )
-        user = await uow.user.get_or_create_user_by_tg_id(user)
-        await uow.commit()
         new_event = Event(
-            user_id=user.id,
+            user_id=user_id,
             description=event.description,
             event_datetime=event.event_datetime,
             repeat_interval=event.repeat_interval,
@@ -78,7 +64,3 @@ async def update_event(
         )
         await uow.commit()
         return EventScheme.model_validate(result)
-
-
-def validate_date_time(date_time_str):
-    return parse_date_time(date_time_str) is not None

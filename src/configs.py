@@ -11,7 +11,7 @@ class DatabaseSettings(BaseModel):
     postgres_user: str
     postgres_password: str
     postgres_host: str
-    postgres_port: str
+    postgres_port: str = "5432"
     postgres_db: str
     echo: bool = False
     echo_pool: bool = False

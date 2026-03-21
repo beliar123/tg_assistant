@@ -1,51 +1,49 @@
-FROM python:3.12-slim-bullseye
+# ===================== STAGE 1: dockerize binary =====================
+FROM alpine:3.21 AS dockerize-downloader
 
-ENV UID=1001 \
-    GID=1001 \
-    PYTHONFAULTHANDLER=1 \
-    PYTHONUNBUFFERED=1 \
-    PYTHONHASHSEED=random \
-    PIP_NO_CACHE_DIR=off \
-    PIP_DISABLE_PIP_VERSION_CHECK=on \
-    PIP_DEFAULT_TIMEOUT=100 \
-    DOCKERIZE_VERSION=v0.9.2 \
-    PATH="$PATH:/root/.local/bin" \
-    TZ="Europe/Moscow"
+ARG DOCKERIZE_VERSION=v0.9.2
 
-RUN apt update \
-  && apt install --no-install-recommends -y \
-    wget \
-  && apt autoremove -y && apt clean -y && rm -rf /var/lib/apt/lists/* \
-  && wget "https://github.com/jwilder/dockerize/releases/download/${DOCKERIZE_VERSION}/dockerize-linux-amd64-${DOCKERIZE_VERSION}.tar.gz" \
-  && tar -C /usr/local/bin -xzvf "dockerize-linux-amd64-${DOCKERIZE_VERSION}.tar.gz" \
-  && rm "dockerize-linux-amd64-${DOCKERIZE_VERSION}.tar.gz" && dockerize --version \
-  && pip install -U pip \
-  && wget -qO- https://astral.sh/uv/install.sh | sh \
-  && uv --version
+RUN apk add --no-cache wget \
+  && wget -q "https://github.com/jwilder/dockerize/releases/download/${DOCKERIZE_VERSION}/dockerize-linux-amd64-${DOCKERIZE_VERSION}.tar.gz" \
+  && tar -C /usr/local/bin -xzf "dockerize-linux-amd64-${DOCKERIZE_VERSION}.tar.gz" \
+  && rm "dockerize-linux-amd64-${DOCKERIZE_VERSION}.tar.gz"
+
+# ===================== STAGE 2: Python dependencies =====================
+FROM python:3.12-slim-bookworm AS deps-builder
+
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
 WORKDIR /code
-
-COPY ./uv.lock ./pyproject.toml /code/
 
 RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=uv.lock,target=uv.lock \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
-    uv sync --frozen --no-install-project --no-dev
-
-RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev
 
-ENV PATH="/code/.venv/bin:$PATH"
+# ===================== STAGE 3: runtime =====================
+FROM python:3.12-slim-bookworm AS runtime
 
-RUN groupadd -r tg_bot && useradd -d /code -r -g tg_bot tg_bot && chown tg_bot:tg_bot -R /code
+ARG UID=1001
+ARG GID=1001
 
-RUN usermod -u $UID tg_bot && groupmod -g $GID tg_bot
+ENV PYTHONFAULTHANDLER=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONHASHSEED=random \
+    TZ="Europe/Moscow" \
+    PATH="/code/.venv/bin:/usr/local/bin:$PATH"
 
+COPY --from=dockerize-downloader /usr/local/bin/dockerize /usr/local/bin/dockerize
+COPY --from=deps-builder /code/.venv /code/.venv
+
+RUN groupadd -r -g ${GID} tg_bot \
+  && useradd -r -u ${UID} -g tg_bot -d /code tg_bot \
+  && chown tg_bot:tg_bot /code
 
 USER tg_bot:tg_bot
 
+WORKDIR /code
+
 COPY --chown=tg_bot:tg_bot src /code/src
-COPY --chown=tg_bot:tg_bot scripts/* /code/
-COPY --chown=tg_bot:tg_bot .env /code/
+COPY --chown=tg_bot:tg_bot scripts/schedule_entrypoint.sh /code/
 
 RUN chmod +x /code/schedule_entrypoint.sh

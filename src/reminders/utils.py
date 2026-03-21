@@ -13,6 +13,14 @@ def parse_date_time(date_time_str: str):
         return None
 
 
+def validate_date_time(date_time_str: str) -> bool:
+    return parse_date_time(date_time_str) is not None
+
+
+def format_events_or_empty(events: tuple[EventScheme, ...]) -> str:
+    return format_event_list(events) if events else "У вас нет запланированных событий. 📋"
+
+
 def format_event_list(events: tuple[EventScheme, ...]):
     return "\n".join(
         [

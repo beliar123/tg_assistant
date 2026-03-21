@@ -2,7 +2,7 @@ from telegram import ReplyKeyboardMarkup, Update
 from telegram.ext import ContextTypes, ConversationHandler
 
 main_keyboard = ReplyKeyboardMarkup(
-    [["Финансы"], ["Напоминания"]],
+    [["Напоминания"]],
     resize_keyboard=True,
     input_field_placeholder="Выбери категорию:",
 )

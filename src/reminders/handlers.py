@@ -18,9 +18,19 @@ from telegram.ext import (
 from src.handlers import cancel, main_keyboard
 from src.reminders import services as event_service
 from src.reminders.schemes import EventCreateScheme, EventRepeatInterval
-from src.reminders.utils import format_event_list
+from src.reminders.utils import format_event_list, format_events_or_empty, validate_date_time
+from src.user import service as user_service
 
 logger = logging.getLogger(__name__)
+
+_CONFIRM_YES = "да"
+_SKIP = "пропустить"
+
+
+def _build_repeat_interval_keyboard() -> list[list[str]]:
+    keyboard = [[interval.value] for interval in EventRepeatInterval]
+    keyboard.append(["Пропустить"])
+    return keyboard
 
 
 class EventDialogStates(Enum):
@@ -36,7 +46,7 @@ class EventDialogStates(Enum):
     EDIT_NAME = "edit_name"
     EDIT_EVENT_DATETIME = "edit_event_datetime"
     EDIT_REPEAT_INTERVAL = "edit_repeat_interval"
-    CONFIRM_EDIT = " confirm_edit"
+    CONFIRM_EDIT = "confirm_edit"
 
 
 async def add_event_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -52,25 +62,23 @@ async def add_event_description(update: Update, context: ContextTypes.DEFAULT_TY
 
 async def add_event_datetime(update: Update, context: ContextTypes.DEFAULT_TYPE):
     date_time_str = update.message.text
-    if not event_service.validate_date_time(date_time_str):
+    if not validate_date_time(date_time_str):
         await update.message.reply_text(
             "Неверный формат даты или времени! Пожалуйста, повторите ввод (формат YYYY-MM-DD HH:MM):"
         )
         return EventDialogStates.ADD_EVENT_DATETIME
 
     context.user_data["event_datetime"] = date_time_str
-    repeat_interval_keyboard = [[interval.value] for interval in list(EventRepeatInterval)]
-    repeat_interval_keyboard.extend([["Пропустить"]])
     await update.message.reply_text(
         "Введите интервал повторения:",
-        reply_markup=ReplyKeyboardMarkup(repeat_interval_keyboard, resize_keyboard=True),
+        reply_markup=ReplyKeyboardMarkup(_build_repeat_interval_keyboard(), resize_keyboard=True),
     )
     return EventDialogStates.ADD_REPEAT_INTERVAL
 
 
 async def add_event_repeat_interval(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    repeat_interval = update.message.text.lower() if update.message.text != "Пропустить" else None
-    context.user_data["repeat_interval"] = repeat_interval
+    text = (update.message.text or "").lower() if update.message else ""
+    context.user_data["repeat_interval"] = None if text == _SKIP else text
     await update.message.reply_text(
         "Введите количество сообщений(число больше 0) для напоминания(по умолчанию будет 3 напоминания.):",
         reply_markup=ReplyKeyboardRemove(),
@@ -115,7 +123,7 @@ async def confirm_event(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def confirm_event_submission(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         confirmation = update.message.text.lower()
-        if confirmation != "да":
+        if confirmation != _CONFIRM_YES:
             await update.message.reply_text("Добавление события отменено. ❌")
             return ConversationHandler.END
         event = EventCreateScheme(
@@ -125,13 +133,13 @@ async def confirm_event_submission(update: Update, context: ContextTypes.DEFAULT
             message_count=context.user_data.get("message_count"),
         )
 
-        result_event = await event_service.add_event_by_tg(
-            event,
+        user_id = await user_service.get_or_create_user(
             update.effective_user.id,
             update.effective_chat.id,
             update.effective_user.first_name,
             update.effective_user.last_name,
         )
+        result_event = await event_service.add_event(event, user_id)
         if result_event:
             await update.message.reply_text(
                 f"Событие успешно добавлено! ✅\n📅 {result_event.description}\n⏰ {result_event.event_datetime}",
@@ -152,12 +160,8 @@ async def confirm_event_submission(update: Update, context: ContextTypes.DEFAULT
 async def get_list_events(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         events = await event_service.get_all_events(update.effective_user.id)
-        if events:
-            message = format_event_list(events)
-        else:
-            message = "У вас нет запланированных событий. 📋"
         await update.message.reply_text(
-            text=message,
+            text=format_events_or_empty(events),
             reply_markup=main_keyboard,
         )
         return ConversationHandler.END
@@ -241,25 +245,23 @@ async def edit_event_description(update: Update, context: ContextTypes.DEFAULT_T
 
 async def edit_event_datetime(update: Update, context: ContextTypes.DEFAULT_TYPE):
     date_time_str = update.message.text
-    if not event_service.validate_date_time(date_time_str):
+    if not validate_date_time(date_time_str):
         await update.message.reply_text(
             "Неверный формат даты или времени! Пожалуйста, повторите ввод (формат YYYY-MM-DD HH:MM):"
         )
         return EventDialogStates.EDIT_EVENT_DATETIME
 
     context.user_data["edit_datetime"] = date_time_str
-    repeat_interval_keyboard = [[interval.value] for interval in list(EventRepeatInterval)]
-    repeat_interval_keyboard.extend([["Пропустить"]])
     await update.message.reply_text(
         "Введите интервал повторения:",
-        reply_markup=ReplyKeyboardMarkup(repeat_interval_keyboard, resize_keyboard=True),
+        reply_markup=ReplyKeyboardMarkup(_build_repeat_interval_keyboard(), resize_keyboard=True),
     )
     return EventDialogStates.EDIT_REPEAT_INTERVAL
 
 
 async def edit_event_repeat_interval(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    repeat_interval = update.message.text.lower()
-    context.user_data["edit_repeat_interval"] = repeat_interval if repeat_interval != "пропустить" else None
+    text = (update.message.text or "").lower() if update.message else ""
+    context.user_data["edit_repeat_interval"] = None if text == _SKIP else text
     await confirm_edit(update, context)
     return EventDialogStates.CONFIRM_EDIT
 
@@ -290,7 +292,7 @@ async def confirm_edit(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def confirm_edit_submission(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         confirmation = update.message.text.lower()
-        if confirmation != "да":
+        if confirmation != _CONFIRM_YES:
             await update.message.reply_text("Редактирование события отменено. ❌", reply_markup=main_keyboard)
             return ConversationHandler.END
 

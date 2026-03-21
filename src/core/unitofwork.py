@@ -1,12 +1,10 @@
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database import db_helper
-from src.repository.category import CategoryRepository
 from src.repository.event import EventRepository
-from src.repository.expense import ExpenseRepository
 from src.repository.user import UserRepository
 
 
@@ -15,9 +13,7 @@ class UnitOfWork:
 
     def __init__(self, session: AsyncSession):
         self.session = session
-        self.expense = ExpenseRepository(session)
         self.user = UserRepository(session)
-        self.category = CategoryRepository(session)
         self.event = EventRepository(session)
 
     async def commit(self):
