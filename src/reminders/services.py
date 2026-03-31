@@ -1,9 +1,9 @@
 import logging
+from datetime import datetime
 
 from src.core.unitofwork import get_uow
 from src.database.models import Event
 from src.reminders.schemes import EventCreateScheme, EventRepeatInterval, EventScheme
-from src.reminders.utils import parse_date_time
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +29,7 @@ async def get_all_events(user_tg_id: int) -> tuple[EventScheme, ...]:
             return tuple(EventScheme.model_validate(event) for event in events)
     except Exception as e:
         logger.error(f"Ошибка при получении событий: {e}")
-        return tuple()
+        return ()
 
 
 async def delete_event(event_id: int, user_tg_id: int) -> bool:
@@ -46,21 +46,17 @@ async def delete_event(event_id: int, user_tg_id: int) -> bool:
 async def update_event(
     event_id: str,
     description: str,
-    date_time_str: str,
+    event_datetime: datetime,
     repeat_interval: EventRepeatInterval | None,
 ) -> EventScheme | None:
-    date_time = parse_date_time(date_time_str)
-    if not date_time:
-        return None
-
     async with get_uow() as uow:
         result = await uow.event.update(
             int(event_id),
             EventCreateScheme(
                 description=description,
-                event_datetime=date_time_str,
+                event_datetime=event_datetime,
                 repeat_interval=repeat_interval,
-            ).dict(exclude_unset=True),
+            ).model_dump(exclude_unset=True),
         )
         await uow.commit()
         return EventScheme.model_validate(result)

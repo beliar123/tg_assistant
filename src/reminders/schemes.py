@@ -25,6 +25,7 @@ class EventScheme(BaseModel):
     description: str
     event_datetime: datetime
     repeat_interval: EventRepeatInterval | None
+    message_count: int
 
     class Config:
         from_attributes = True

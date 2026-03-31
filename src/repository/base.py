@@ -1,4 +1,5 @@
-from typing import Any, Generic, Optional, Sequence, Type, TypeVar
+from collections.abc import Sequence
+from typing import Any, Generic, TypeVar
 
 from sqlalchemy import delete, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,11 +13,11 @@ T = TypeVar("T", bound=BaseDbModel)
 class BaseRepository(Generic[T]):
     """Абстрактный репозиторий для CRUD-операций."""
 
-    def __init__(self, session: AsyncSession, model: Type[T]):
+    def __init__(self, session: AsyncSession, model: type[T]):
         self.session = session
         self.model = model
 
-    async def get_by_id(self, obj_id: int) -> Optional[T]:
+    async def get_by_id(self, obj_id: int) -> T | None:
         """Получает объект по ID."""
         stmt = select(self.model).where(self.model.id == obj_id)
         result = await self.session.execute(stmt)
@@ -39,6 +40,11 @@ class BaseRepository(Generic[T]):
         await self.session.execute(stmt)
 
     async def update(self, obj_id: int, update_fields: dict[str, Any]):
-        stmt = update(self.model).where(self.model.id == obj_id).values(**update_fields).returning(self.model)
+        stmt = (
+            update(self.model)
+            .where(self.model.id == obj_id)
+            .values(**update_fields)
+            .returning(self.model)
+        )
         result = await self.session.execute(stmt)
         return result.scalar_one()

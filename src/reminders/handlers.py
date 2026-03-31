@@ -6,6 +6,7 @@ from telegram import (
     ReplyKeyboardRemove,
     Update,
 )
+from telegram.constants import ParseMode
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -18,7 +19,13 @@ from telegram.ext import (
 from src.handlers import cancel, main_keyboard
 from src.reminders import services as event_service
 from src.reminders.schemes import EventCreateScheme, EventRepeatInterval
-from src.reminders.utils import format_event_list, format_events_or_empty, validate_date_time
+from src.reminders.utils import (
+    format_event_list,
+    format_events_or_empty,
+    parse_date_time,
+    to_msk,
+)
+from src.templates.renderer import render
 from src.user import service as user_service
 
 logger = logging.getLogger(__name__)
@@ -50,28 +57,36 @@ class EventDialogStates(Enum):
 
 
 async def add_event_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Введите описание события:", reply_markup=ReplyKeyboardRemove())
+    await update.message.reply_text(
+        "Введите описание события:", reply_markup=ReplyKeyboardRemove()
+    )
     return EventDialogStates.ADD_DESCRIPTION
 
 
 async def add_event_description(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["description"] = update.message.text
-    await update.message.reply_text("Введите дату и время напоминания (формат YYYY-MM-DD HH:MM):")
+    await update.message.reply_text(
+        "Введите дату и время напоминания по МСК (формат YYYY-MM-DD HH:MM):"
+    )
     return EventDialogStates.ADD_EVENT_DATETIME
 
 
 async def add_event_datetime(update: Update, context: ContextTypes.DEFAULT_TYPE):
     date_time_str = update.message.text
-    if not validate_date_time(date_time_str):
+    utc_dt = parse_date_time(date_time_str)
+    if not utc_dt:
         await update.message.reply_text(
-            "Неверный формат даты или времени! Пожалуйста, повторите ввод (формат YYYY-MM-DD HH:MM):"
+            "Неверный формат! Повторите ввод по МСК (формат YYYY-MM-DD HH:MM):"
         )
         return EventDialogStates.ADD_EVENT_DATETIME
 
-    context.user_data["event_datetime"] = date_time_str
+    context.user_data["event_datetime"] = utc_dt
+    context.user_data["event_datetime_display"] = date_time_str
     await update.message.reply_text(
         "Введите интервал повторения:",
-        reply_markup=ReplyKeyboardMarkup(_build_repeat_interval_keyboard(), resize_keyboard=True),
+        reply_markup=ReplyKeyboardMarkup(
+            _build_repeat_interval_keyboard(), resize_keyboard=True
+        ),
     )
     return EventDialogStates.ADD_REPEAT_INTERVAL
 
@@ -89,7 +104,9 @@ async def add_event_repeat_interval(update: Update, context: ContextTypes.DEFAUL
 async def add_event_message_count(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message_count: str = update.message.text or "3"
     if not message_count.isdigit():
-        await update.message.reply_text("Некорректное количество напоминаний, введите число больше 0:")
+        await update.message.reply_text(
+            "Некорректное количество напоминаний, введите число больше 0:"
+        )
         return EventDialogStates.ADD_MESSAGE_COUNT
     context.user_data["message_count"] = int(message_count)
     await confirm_event(update, context)
@@ -98,18 +115,17 @@ async def add_event_message_count(update: Update, context: ContextTypes.DEFAULT_
 
 async def confirm_event(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
-        description = context.user_data.get("description")
-        date_time = context.user_data.get("event_datetime")
-        repeat_interval = context.user_data.get("repeat_interval")
-        message_count = context.user_data.get("message_count")
-
-        message = f"Событие:\n🗓️ Описание: {description}\n⏰ Дата/время: {date_time}\n🔄 Интервал: {repeat_interval or 'Однократное'}\n🔢 Количество сообщений: {message_count}"
+        text = render(
+            "event_confirm.md",
+            description=context.user_data.get("description"),
+            event_datetime=context.user_data.get("event_datetime_display"),
+            repeat_interval=context.user_data.get("repeat_interval"),
+            message_count=context.user_data.get("message_count"),
+        )
         await update.message.reply_text(
-            f"{message}\nПодтвердите добавление события (да/нет):",
-            reply_markup=ReplyKeyboardMarkup(
-                [["Да"], ["Нет"]],
-                resize_keyboard=True,
-            ),
+            text,
+            parse_mode=ParseMode.MARKDOWN_V2,
+            reply_markup=ReplyKeyboardMarkup([["Да"], ["Нет"]], resize_keyboard=True),
         )
     except Exception as e:
         logger.error(f"Ошибка при подтверждении события: {e}")
@@ -142,11 +158,18 @@ async def confirm_event_submission(update: Update, context: ContextTypes.DEFAULT
         result_event = await event_service.add_event(event, user_id)
         if result_event:
             await update.message.reply_text(
-                f"Событие успешно добавлено! ✅\n📅 {result_event.description}\n⏰ {result_event.event_datetime}",
+                render(
+                    "event_added.md",
+                    description=result_event.description,
+                    event_datetime=to_msk(result_event.event_datetime),
+                ),
+                parse_mode=ParseMode.MARKDOWN_V2,
                 reply_markup=main_keyboard,
             )
         else:
-            await update.message.reply_text("Произошла ошибка при добавлении события. Попробуйте снова. ❌")
+            await update.message.reply_text(
+                "Произошла ошибка при добавлении события. Попробуйте снова. ❌"
+            )
         return ConversationHandler.END
     except Exception as e:
         logger.error(f"Ошибка при добавлении события: {e}")
@@ -162,12 +185,15 @@ async def get_list_events(update: Update, context: ContextTypes.DEFAULT_TYPE):
         events = await event_service.get_all_events(update.effective_user.id)
         await update.message.reply_text(
             text=format_events_or_empty(events),
+            parse_mode=ParseMode.MARKDOWN_V2,
             reply_markup=main_keyboard,
         )
         return ConversationHandler.END
     except Exception as e:
         logger.error(f"Ошибка при получении списка событий: {e}")
-        await update.message.reply_text("Произошла ошибка при получении списка событий. Попробуйте позже. ❌")
+        await update.message.reply_text(
+            "Произошла ошибка при получении списка событий. Попробуйте позже. ❌"
+        )
         return ConversationHandler.END
 
 
@@ -177,15 +203,21 @@ async def delete_event_start(update: Update, context: ContextTypes.DEFAULT_TYPE)
         if events:
             message = format_event_list(events)
         else:
-            message = "У вас нет запланированных событий. 📋"
-            await update.message.reply_text(message, reply_markup=main_keyboard)
+            message = render("event_empty.md")
+            await update.message.reply_text(
+                message, parse_mode=ParseMode.MARKDOWN_V2, reply_markup=main_keyboard
+            )
             return ConversationHandler.END
-        await update.message.reply_text(message, reply_markup=ReplyKeyboardRemove())
+        await update.message.reply_text(
+            message, parse_mode=ParseMode.MARKDOWN_V2, reply_markup=ReplyKeyboardRemove()
+        )
         await update.message.reply_text("Введите id событие для удаления:")
         return EventDialogStates.DELETE_EVENT
     except Exception as e:
         logger.error(f"Ошибка при старте удаления события: {e}")
-        await update.message.reply_text("Произошла ошибка при удалении события. Попробуйте позже. ❌")
+        await update.message.reply_text(
+            "Произошла ошибка при удалении события. Попробуйте позже. ❌"
+        )
         return ConversationHandler.END
 
 
@@ -193,13 +225,20 @@ async def delete_event(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         event_id = update.message.text
         if not event_id or not event_id.isdigit():
-            await update.message.reply_text("Пожалуйста, введите корректный ID напоминания.")
+            await update.message.reply_text(
+                "Пожалуйста, введите корректный ID напоминания."
+            )
             return EventDialogStates.DELETE_EVENT
         await event_service.delete_event(int(event_id), update.effective_user.id)
-        await update.message.reply_text(f"Событие с ID={event_id} успешно удалено. ✅")
+        await update.message.reply_text(
+            render("event_deleted.md", event_id=event_id),
+            parse_mode=ParseMode.MARKDOWN_V2,
+        )
     except Exception as e:
         logger.error(f"Ошибка при удалении события: {e}")
-        await update.message.reply_text("Произошла ошибка при удалении события. Попробуйте позже. ❌")
+        await update.message.reply_text(
+            "Произошла ошибка при удалении события. Попробуйте позже. ❌"
+        )
     return ConversationHandler.END
 
 
@@ -209,15 +248,21 @@ async def edit_event_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if events:
             message = format_event_list(events)
         else:
-            message = "У вас нет запланированных событий. 📋"
-            await update.message.reply_text(message, reply_markup=main_keyboard)
+            message = render("event_empty.md")
+            await update.message.reply_text(
+                message, parse_mode=ParseMode.MARKDOWN_V2, reply_markup=main_keyboard
+            )
             return ConversationHandler.END
-        await update.message.reply_text(message, reply_markup=ReplyKeyboardRemove())
+        await update.message.reply_text(
+            message, parse_mode=ParseMode.MARKDOWN_V2, reply_markup=ReplyKeyboardRemove()
+        )
         await update.message.reply_text("Введите id события для редактирования:")
         return EventDialogStates.EDIT_EVENT
     except Exception as e:
         logger.error(f"Ошибка при старте редактирования события: {e}")
-        await update.message.reply_text("Произошла ошибка при редактировании события. Попробуйте позже. ❌")
+        await update.message.reply_text(
+            "Произошла ошибка при редактировании события. Попробуйте позже. ❌"
+        )
         return ConversationHandler.END
 
 
@@ -225,7 +270,9 @@ async def choice_event(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         event_id = update.message.text
         if not event_id or not event_id.isdigit():
-            await update.message.reply_text("Пожалуйста, введите корректный ID напоминания.")
+            await update.message.reply_text(
+                "Пожалуйста, введите корректный ID напоминания."
+            )
             return EventDialogStates.EDIT_EVENT
 
         context.user_data["event_id"] = event_id
@@ -233,28 +280,36 @@ async def choice_event(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return EventDialogStates.EDIT_NAME
     except Exception as e:
         logger.error(f"Ошибка при выборе события для редактирования: {e}")
-        await update.message.reply_text("Произошла ошибка при выборе события для редактирования. Попробуйте позже. ❌")
+        await update.message.reply_text(
+            "Произошла ошибка при выборе события для редактирования. Попробуйте позже. ❌"
+        )
         return ConversationHandler.END
 
 
 async def edit_event_description(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["edit_description"] = update.message.text
-    await update.message.reply_text("Введите новую дату и время события (формат YYYY-MM-DD HH:MM):")
+    await update.message.reply_text(
+        "Введите новую дату и время события по МСК (формат YYYY-MM-DD HH:MM):"
+    )
     return EventDialogStates.EDIT_EVENT_DATETIME
 
 
 async def edit_event_datetime(update: Update, context: ContextTypes.DEFAULT_TYPE):
     date_time_str = update.message.text
-    if not validate_date_time(date_time_str):
+    utc_dt = parse_date_time(date_time_str)
+    if not utc_dt:
         await update.message.reply_text(
-            "Неверный формат даты или времени! Пожалуйста, повторите ввод (формат YYYY-MM-DD HH:MM):"
+            "Неверный формат! Повторите ввод по МСК (формат YYYY-MM-DD HH:MM):"
         )
         return EventDialogStates.EDIT_EVENT_DATETIME
 
-    context.user_data["edit_datetime"] = date_time_str
+    context.user_data["edit_datetime"] = utc_dt
+    context.user_data["edit_datetime_display"] = date_time_str
     await update.message.reply_text(
         "Введите интервал повторения:",
-        reply_markup=ReplyKeyboardMarkup(_build_repeat_interval_keyboard(), resize_keyboard=True),
+        reply_markup=ReplyKeyboardMarkup(
+            _build_repeat_interval_keyboard(), resize_keyboard=True
+        ),
     )
     return EventDialogStates.EDIT_REPEAT_INTERVAL
 
@@ -268,17 +323,16 @@ async def edit_event_repeat_interval(update: Update, context: ContextTypes.DEFAU
 
 async def confirm_edit(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
-        description = context.user_data.get("edit_description")
-        event_datetime = context.user_data.get("edit_datetime")
-        repeat_interval = context.user_data.get("edit_repeat_interval")
-
-        message = f"Событие:\n📅 Название: {description}\n⏰ Дата/время: {event_datetime}\n🔄 Интервал: {repeat_interval or 'Однократное'}"
+        text = render(
+            "event_edit_confirm.md",
+            description=context.user_data.get("edit_description"),
+            event_datetime=context.user_data.get("edit_datetime_display"),
+            repeat_interval=context.user_data.get("edit_repeat_interval"),
+        )
         await update.message.reply_text(
-            f"{message}\nПодтвердите изменение события (да/нет):",
-            reply_markup=ReplyKeyboardMarkup(
-                [["Да"], ["Нет"]],
-                resize_keyboard=True,
-            ),
+            text,
+            parse_mode=ParseMode.MARKDOWN_V2,
+            reply_markup=ReplyKeyboardMarkup([["Да"], ["Нет"]], resize_keyboard=True),
         )
     except Exception as e:
         logger.error(f"Ошибка при подтверждении редактирования события: {e}")
@@ -293,7 +347,9 @@ async def confirm_edit_submission(update: Update, context: ContextTypes.DEFAULT_
     try:
         confirmation = update.message.text.lower()
         if confirmation != _CONFIRM_YES:
-            await update.message.reply_text("Редактирование события отменено. ❌", reply_markup=main_keyboard)
+            await update.message.reply_text(
+                "Редактирование события отменено. ❌", reply_markup=main_keyboard
+            )
             return ConversationHandler.END
 
         description = context.user_data.get("edit_description")
@@ -301,23 +357,36 @@ async def confirm_edit_submission(update: Update, context: ContextTypes.DEFAULT_
         repeat_interval = context.user_data.get("edit_repeat_interval")
         event_id = int(context.user_data.get("event_id"))
 
-        result = await event_service.update_event(event_id, description, event_datetime, repeat_interval)
+        result = await event_service.update_event(
+            event_id, description, event_datetime, repeat_interval
+        )
         if result:
             await update.message.reply_text(
-                f"Событие с ID={event_id} успешно обновлено! ✅", reply_markup=main_keyboard
+                render("event_updated.md", event_id=event_id),
+                parse_mode=ParseMode.MARKDOWN_V2,
+                reply_markup=main_keyboard,
             )
         else:
-            await update.message.reply_text(f"Событие с ID={event_id} не обновлено. ❌", reply_markup=main_keyboard)
+            await update.message.reply_text(
+                f"Событие с ID={event_id} не обновлено. ❌", reply_markup=main_keyboard
+            )
         return ConversationHandler.END
     except Exception as e:
         logger.error(f"Ошибка при обновлении события: {e}")
-        await update.message.reply_text("Произошла ошибка при обновлении события. Попробуйте снова. ❌")
+        await update.message.reply_text(
+            "Произошла ошибка при обновлении события. Попробуйте снова. ❌"
+        )
         return ConversationHandler.END
 
 
 async def start_reminders_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     finance_keyboard = ReplyKeyboardMarkup(
-        [["Добавить напоминание"], ["Посмотреть напоминания"], ["Удалить напоминание"], ["Редактировать напоминание"]],
+        [
+            ["Добавить напоминание"],
+            ["Посмотреть напоминания"],
+            ["Удалить напоминание"],
+            ["Редактировать напоминание"],
+        ],
         resize_keyboard=True,
         input_field_placeholder="Выбери действие:",
     )
@@ -325,16 +394,24 @@ async def start_reminders_handler(update: Update, context: ContextTypes.DEFAULT_
 
 
 def register_reminder_handler(application: Application):
-    start_handler = MessageHandler(filters.Regex("^Напоминания$"), start_reminders_handler)
+    start_handler = MessageHandler(
+        filters.Regex("^Напоминания$"), start_reminders_handler
+    )
 
     add_event_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.Regex("^Добавить напоминание$"), add_event_start)],
+        entry_points=[
+            MessageHandler(filters.Regex("^Добавить напоминание$"), add_event_start)
+        ],
         states={
-            EventDialogStates.ADD_DESCRIPTION: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_event_description)],
+            EventDialogStates.ADD_DESCRIPTION: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, add_event_description)
+            ],
             EventDialogStates.ADD_MESSAGE_COUNT: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, add_event_message_count)
             ],
-            EventDialogStates.ADD_EVENT_DATETIME: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_event_datetime)],
+            EventDialogStates.ADD_EVENT_DATETIME: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, add_event_datetime)
+            ],
             EventDialogStates.ADD_REPEAT_INTERVAL: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, add_event_repeat_interval)
             ],
@@ -346,28 +423,44 @@ def register_reminder_handler(application: Application):
     )
 
     edit_event_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.Regex("^Редактировать напоминание$"), edit_event_start)],
+        entry_points=[
+            MessageHandler(filters.Regex("^Редактировать напоминание$"), edit_event_start)
+        ],
         states={
-            EventDialogStates.EDIT_EVENT: [MessageHandler(filters.TEXT & ~filters.COMMAND, choice_event)],
-            EventDialogStates.EDIT_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, edit_event_description)],
+            EventDialogStates.EDIT_EVENT: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, choice_event)
+            ],
+            EventDialogStates.EDIT_NAME: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, edit_event_description)
+            ],
             EventDialogStates.EDIT_EVENT_DATETIME: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, edit_event_datetime)
             ],
             EventDialogStates.EDIT_REPEAT_INTERVAL: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, edit_event_repeat_interval)
+                MessageHandler(
+                    filters.TEXT & ~filters.COMMAND, edit_event_repeat_interval
+                )
             ],
-            EventDialogStates.CONFIRM_EDIT: [MessageHandler(filters.TEXT & ~filters.COMMAND, confirm_edit_submission)],
+            EventDialogStates.CONFIRM_EDIT: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, confirm_edit_submission)
+            ],
         },
         fallbacks=[CommandHandler("cancel", cancel)],
     )
     delete_event_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.Regex("^Удалить напоминание$"), delete_event_start)],
+        entry_points=[
+            MessageHandler(filters.Regex("^Удалить напоминание$"), delete_event_start)
+        ],
         states={
-            EventDialogStates.DELETE_EVENT: [MessageHandler(filters.TEXT & ~filters.COMMAND, delete_event)],
+            EventDialogStates.DELETE_EVENT: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, delete_event)
+            ],
         },
         fallbacks=[CommandHandler("cancel", cancel)],
     )
-    list_events_handler = MessageHandler(filters.Regex("^Посмотреть напоминания$"), get_list_events)
+    list_events_handler = MessageHandler(
+        filters.Regex("^Посмотреть напоминания$"), get_list_events
+    )
     application.add_handler(start_handler)
     application.add_handler(add_event_handler)
     application.add_handler(edit_event_handler)

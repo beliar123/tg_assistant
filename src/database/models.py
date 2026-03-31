@@ -45,15 +45,16 @@ class BaseDbModel(DeclarativeBase):
 
 class User(BaseDbModel):
     telegram_id: Mapped[int] = mapped_column(unique=True)
-    chat_id: Mapped[int] = mapped_column(unique=True)
+    chat_id: Mapped[int] = mapped_column()
     name: Mapped[str] = mapped_column(String(32))
     lastname: Mapped[str | None] = mapped_column(String(32))
+    email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     is_active: Mapped[bool] = mapped_column(default=True)
     events: Mapped[list["Event"]] = relationship(back_populates="user")
 
 
 class Event(BaseDbModel):
-    event_datetime: Mapped[datetime]
+    event_datetime: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     description: Mapped[str] = mapped_column(Text)
     repeat_interval: Mapped[EventRepeatInterval | None] = mapped_column(
         postgresql.ENUM(

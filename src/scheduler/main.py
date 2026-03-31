@@ -10,7 +10,9 @@ from src.scheduler.tasks import check_events, send_reminder
 
 redis_settings = RedisSettings(host="redis")
 
-logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
+)
 
 
 async def startup(ctx):

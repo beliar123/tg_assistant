@@ -1,16 +1,31 @@
 import logging
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from src.reminders.schemes import EventScheme
+from src.templates.renderer import render
 
 logger = logging.getLogger(__name__)
 
+MSK = ZoneInfo("Europe/Moscow")
+UTC = ZoneInfo("UTC")
 
-def parse_date_time(date_time_str: str):
+
+def parse_date_time(date_time_str: str) -> datetime | None:
+    """Парсит строку как московское время и конвертирует в UTC."""
     try:
-        return datetime.strptime(date_time_str, "%Y-%m-%d %H:%M")
+        naive = datetime.strptime(date_time_str, "%Y-%m-%d %H:%M")
+        msk_dt = naive.replace(tzinfo=MSK)
+        return msk_dt.astimezone(UTC)
     except ValueError:
         return None
+
+
+def to_msk(dt: datetime) -> str:
+    """Конвертирует UTC datetime в строку московского времени."""
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=UTC)
+    return dt.astimezone(MSK).strftime("%Y-%m-%d %H:%M")
 
 
 def validate_date_time(date_time_str: str) -> bool:
@@ -18,13 +33,10 @@ def validate_date_time(date_time_str: str) -> bool:
 
 
 def format_events_or_empty(events: tuple[EventScheme, ...]) -> str:
-    return format_event_list(events) if events else "У вас нет запланированных событий. 📋"
+    if not events:
+        return render("event_empty.md")
+    return render("event_list.md", events=events, to_msk=to_msk)
 
 
-def format_event_list(events: tuple[EventScheme, ...]):
-    return "\n".join(
-        [
-            f"📅 ID:{e.id}\nОписание: {e.description}\nВремя события: {e.event_datetime}\nПовтор: {e.repeat_interval.value if e.repeat_interval else 'однократное'}\n"
-            for e in events
-        ]
-    )
+def format_event_list(events: tuple[EventScheme, ...]) -> str:
+    return render("event_list.md", events=events, to_msk=to_msk)

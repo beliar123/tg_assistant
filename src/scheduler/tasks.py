@@ -1,27 +1,34 @@
-from pytz import timezone
 import logging
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from arq.connections import ArqRedis
-from telegram import Bot
 
 from src.core.unitofwork import get_uow
+from src.notifications.email import send_email_reminder
+from src.notifications.telegram import send_telegram_reminder
 from src.scheduler.utils import calculate_next_occurrence
 
 logger = logging.getLogger(__name__)
 
 
-async def send_reminder(context: dict[str, Any], user_tg_id: int, event_id: int, message: str):
-    bot: Bot = context["bot"]
-    await bot.send_message(user_tg_id, text=f"Напоминание: {message}")
-    logger.info(f"Напоминание id:{event_id} отправленно пользователю(telegram_id: {user_tg_id})")
+async def send_reminder(
+    context: dict[str, Any],
+    user_tg_id: int,
+    event_id: int,
+    message: str,
+    user_email: str | None = None,
+):
+    await send_telegram_reminder(context, user_tg_id, message, event_id)
+
+    if user_email:
+        await send_email_reminder(user_email, message, event_id)
 
 
 async def check_events(context: dict[str, Any]):
     try:
         logger.info("Получение напоминаний.")
-        now = datetime.now()
+        now = datetime.now(tz=UTC)
         period_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
         period_end = now.replace(hour=23, minute=59, second=59, microsecond=999999)
         redis: ArqRedis = context["redis"]
@@ -42,16 +49,20 @@ async def check_events(context: dict[str, Any]):
                         user.telegram_id,
                         event.id,
                         event.description,
+                        user.email,
+                        _job_id=f"reminder_{event.id}_{count}",
                         _defer_until=time_to_send,
                     )
-
                     logger.info(
-                        f"Напоминание id: {event.id} поставленна в очередь на отправку {time_to_send.date()} в {time_to_send.time()}."
+                        f"Напоминание id: {event.id} поставлено в очередь на отправку {time_to_send.date()} в {time_to_send.time()}."
                     )
+
                 if event.repeat_interval is None:
                     await uow.event.delete(event.id)
                 else:
-                    next_occurrence = calculate_next_occurrence(event.event_datetime, event.repeat_interval)
+                    next_occurrence = calculate_next_occurrence(
+                        event.event_datetime, event.repeat_interval
+                    )
                     await uow.event.update(event.id, {"event_datetime": next_occurrence})
 
             await uow.commit()

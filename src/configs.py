@@ -33,9 +33,19 @@ class DatabaseSettings(BaseModel):
         )
 
 
+class EmailSettings(BaseModel):
+    host: str = "smtp.gmail.com"
+    port: int = 465
+    username: str = ""
+    password: str = ""
+    from_address: str = ""
+    use_tls: bool = True
+
+
 class Settings(BaseSettings):
     bot: BotSettings
     database: DatabaseSettings
+    email: EmailSettings = EmailSettings()
 
     model_config = SettingsConfigDict(
         env_file=".env",
