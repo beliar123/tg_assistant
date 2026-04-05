@@ -13,7 +13,7 @@ from sqlalchemy.orm import (
 from sqlalchemy.sql import func
 
 from src.configs import settings
-from src.reminders.schemes import EventRepeatInterval
+from src.reminders.enums import EventRepeatInterval
 from src.utils import camel_case_to_snake_case, datetime_utc_now
 
 

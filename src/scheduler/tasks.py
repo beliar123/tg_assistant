@@ -54,7 +54,7 @@ async def check_events(context: dict[str, Any]):
                         _defer_until=time_to_send,
                     )
                     logger.info(
-                        f"Напоминание id: {event.id} поставлено в очередь на отправку {time_to_send.date()} в {time_to_send.time()}."
+                        f"Напоминание id: {event.id} поставлено в очередь на отправку {time_to_send.date()} в {time_to_send.time()} UTC."
                     )
 
                 if event.repeat_interval is None:

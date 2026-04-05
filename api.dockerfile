@@ -31,8 +31,9 @@ WORKDIR /code
 
 COPY --chown=tg_bot:tg_bot alembic /code/alembic
 COPY --chown=tg_bot:tg_bot src /code/src
-COPY --chown=tg_bot:tg_bot scripts/entrypoint.sh /code/
+COPY --chown=tg_bot:tg_bot scripts/api_entrypoint.sh /code/
 COPY --chown=tg_bot:tg_bot alembic.ini /code/
-COPY --chown=tg_bot:tg_bot main.py /code/
 
-RUN chmod +x /code/entrypoint.sh
+RUN chmod +x /code/api_entrypoint.sh
+
+EXPOSE 8000

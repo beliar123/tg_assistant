@@ -1,15 +1,8 @@
 from datetime import datetime
-from enum import Enum
 
 from pydantic import BaseModel
 
-
-class EventRepeatInterval(Enum):
-    DAILY = "ежедневно"
-    WEEKLY = "еженедельно"
-    MONTHLY = "ежемесячно"
-    SIXMONTH = "раз в полгода"
-    YEARLY = "ежегодно"
+from src.reminders.enums import EventRepeatInterval
 
 
 class EventCreateScheme(BaseModel):

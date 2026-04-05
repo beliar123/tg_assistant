@@ -9,7 +9,6 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     uv sync --frozen --no-dev
 
-# ===================== STAGE 3: runtime =====================
 FROM python:3.12-slim-bookworm AS runtime
 
 ARG UID=1001

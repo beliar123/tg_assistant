@@ -54,6 +54,19 @@ services:
         condition: service_healthy
     restart: "unless-stopped"
 
+  api:
+    build:
+      context: .
+      dockerfile: api.dockerfile
+    command: sh ./api_entrypoint.sh
+    env_file: .env
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "unless-stopped"
+
 volumes:
   tg-assistant-data:
   redis-data:

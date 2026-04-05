@@ -3,7 +3,8 @@ from datetime import datetime
 
 from src.core.unitofwork import get_uow
 from src.database.models import Event
-from src.reminders.schemes import EventCreateScheme, EventRepeatInterval, EventScheme
+from src.reminders.enums import EventRepeatInterval
+from src.reminders.schemes import EventCreateScheme, EventScheme
 
 logger = logging.getLogger(__name__)
 
@@ -22,21 +23,20 @@ async def add_event(event: EventCreateScheme, user_id: int) -> EventScheme:
         return EventScheme.model_validate(new_event)
 
 
-async def get_all_events(user_tg_id: int) -> tuple[EventScheme, ...]:
+async def get_all_events(user_id: int) -> tuple[EventScheme, ...]:
     try:
         async with get_uow() as uow:
-            events = await uow.event.get_all_by_user_tg(user_tg_id)
+            events = await uow.event.get_all_by_user_id(user_id)
             return tuple(EventScheme.model_validate(event) for event in events)
     except Exception as e:
         logger.error(f"Ошибка при получении событий: {e}")
         return ()
 
 
-async def delete_event(event_id: int, user_tg_id: int) -> bool:
+async def delete_event(event_id: int, user_id: int) -> bool:
     async with get_uow() as uow:
-        user = await uow.user.get_user_by_tg_id(user_tg_id)
         event = await uow.event.get_by_id(event_id)
-        if user and event and event.user_id == user.id:
+        if event and event.user_id == user_id:
             await uow.session.delete(event)
             await uow.commit()
             return True
@@ -44,14 +44,14 @@ async def delete_event(event_id: int, user_tg_id: int) -> bool:
 
 
 async def update_event(
-    event_id: str,
+    event_id: int,
     description: str,
     event_datetime: datetime,
     repeat_interval: EventRepeatInterval | None,
 ) -> EventScheme | None:
     async with get_uow() as uow:
         result = await uow.event.update(
-            int(event_id),
+            event_id,
             EventCreateScheme(
                 description=description,
                 event_datetime=event_datetime,

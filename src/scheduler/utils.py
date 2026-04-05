@@ -2,7 +2,7 @@ from datetime import datetime
 
 from dateutil.relativedelta import relativedelta
 
-from src.reminders.schemes import EventRepeatInterval
+from src.reminders.enums import EventRepeatInterval
 
 
 def calculate_next_occurrence(current_date_time: datetime, repeat_interval: EventRepeatInterval):

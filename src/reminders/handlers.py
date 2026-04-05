@@ -18,7 +18,8 @@ from telegram.ext import (
 
 from src.handlers import cancel, main_keyboard
 from src.reminders import services as event_service
-from src.reminders.schemes import EventCreateScheme, EventRepeatInterval
+from src.reminders.enums import EventRepeatInterval
+from src.reminders.schemes import EventCreateScheme
 from src.reminders.utils import (
     format_event_list,
     format_events_or_empty,
@@ -182,7 +183,13 @@ async def confirm_event_submission(update: Update, context: ContextTypes.DEFAULT
 
 async def get_list_events(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
-        events = await event_service.get_all_events(update.effective_user.id)
+        user_id = await user_service.get_or_create_user(
+            update.effective_user.id,
+            update.effective_chat.id,
+            update.effective_user.first_name,
+            update.effective_user.last_name,
+        )
+        events = await event_service.get_all_events(user_id)
         await update.message.reply_text(
             text=format_events_or_empty(events),
             parse_mode=ParseMode.MARKDOWN_V2,
@@ -199,7 +206,14 @@ async def get_list_events(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def delete_event_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
-        events = await event_service.get_all_events(update.effective_user.id)
+        user_id = await user_service.get_or_create_user(
+            update.effective_user.id,
+            update.effective_chat.id,
+            update.effective_user.first_name,
+            update.effective_user.last_name,
+        )
+        context.user_data["user_id"] = user_id
+        events = await event_service.get_all_events(user_id)
         if events:
             message = format_event_list(events)
         else:
@@ -229,7 +243,7 @@ async def delete_event(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "Пожалуйста, введите корректный ID напоминания."
             )
             return EventDialogStates.DELETE_EVENT
-        await event_service.delete_event(int(event_id), update.effective_user.id)
+        await event_service.delete_event(int(event_id), context.user_data["user_id"])
         await update.message.reply_text(
             render("event_deleted.md", event_id=event_id),
             parse_mode=ParseMode.MARKDOWN_V2,
@@ -244,7 +258,13 @@ async def delete_event(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def edit_event_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
-        events = await event_service.get_all_events(update.effective_user.id)
+        user_id = await user_service.get_or_create_user(
+            update.effective_user.id,
+            update.effective_chat.id,
+            update.effective_user.first_name,
+            update.effective_user.last_name,
+        )
+        events = await event_service.get_all_events(user_id)
         if events:
             message = format_event_list(events)
         else:
@@ -275,7 +295,7 @@ async def choice_event(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             return EventDialogStates.EDIT_EVENT
 
-        context.user_data["event_id"] = event_id
+        context.user_data["event_id"] = int(event_id)
         await update.message.reply_text("Введите новое описание события:")
         return EventDialogStates.EDIT_NAME
     except Exception as e:
@@ -355,7 +375,7 @@ async def confirm_edit_submission(update: Update, context: ContextTypes.DEFAULT_
         description = context.user_data.get("edit_description")
         event_datetime = context.user_data.get("edit_datetime")
         repeat_interval = context.user_data.get("edit_repeat_interval")
-        event_id = int(context.user_data.get("event_id"))
+        event_id = context.user_data.get("event_id")
 
         result = await event_service.update_event(
             event_id, description, event_datetime, repeat_interval
