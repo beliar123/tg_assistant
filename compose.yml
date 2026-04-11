@@ -60,6 +60,7 @@ services:
       - "traefik.http.routers.api.rule=Host(`${DOMAIN}`) && PathPrefix(`/api/`)"
       - "traefik.http.routers.api.entrypoints=websecure"
       - "traefik.http.routers.api.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.api.priority=10"
       - "traefik.http.services.api.loadbalancer.server.port=8000"
       - "traefik.http.middlewares.strip-api.stripprefix.prefixes=/api"
       - "traefik.http.routers.api.middlewares=strip-api"
@@ -96,9 +97,10 @@ services:
       - ./frontend:/usr/share/nginx/html:ro
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.frontend.rule=Host(`${DOMAIN}`) && !PathPrefix(`/api/`)"
+      - "traefik.http.routers.frontend.rule=Host(`${DOMAIN}`)"
       - "traefik.http.routers.frontend.entrypoints=websecure"
       - "traefik.http.routers.frontend.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.frontend.priority=1"
       - "traefik.http.services.frontend.loadbalancer.server.port=80"
     restart: "unless-stopped"
 
