@@ -1,10 +1,5 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
-
-class BotSettings(BaseModel):
-    token: str
-    reminder_token: str
 
 
 class DatabaseSettings(BaseModel):
@@ -48,12 +43,26 @@ class JWTSettings(BaseModel):
     access_token_expire_minutes: int = 15
     refresh_token_expire_days: int = 30
 
+    @field_validator("algorithm")
+    @classmethod
+    def algorithm_must_be_safe(cls, v: str) -> str:
+        allowed = {"HS256", "HS384", "HS512"}
+        if v not in allowed:
+            raise ValueError(f"JWT algorithm must be one of {allowed}, got '{v}'")
+        return v
+
+
+class RedisSettings(BaseModel):
+    host: str = "redis"
+    port: int = 6379
+    password: str | None = None
+
 
 class Settings(BaseSettings):
-    bot: BotSettings
     database: DatabaseSettings
     email: EmailSettings = EmailSettings()
     jwt: JWTSettings
+    redis: RedisSettings = RedisSettings()
 
     model_config = SettingsConfigDict(
         env_file=".env",

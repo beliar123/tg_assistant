@@ -1,8 +1,8 @@
-"""empty message
+"""init
 
-Revision ID: ea5b0e12e863
+Revision ID: fdb34d7990a9
 Revises:
-Create Date: 2026-04-05 18:09:15.710862
+Create Date: 2026-04-11 14:30:22.022607
 
 """
 from typing import Sequence, Union
@@ -11,7 +11,7 @@ from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
-revision: str = 'ea5b0e12e863'
+revision: str = 'fdb34d7990a9'
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -22,8 +22,6 @@ def upgrade() -> None:
     op.create_table('user',
     sa.Column('username', sa.String(length=64), nullable=False),
     sa.Column('hashed_password', sa.String(length=255), nullable=False),
-    sa.Column('telegram_id', sa.Integer(), nullable=True),
-    sa.Column('chat_id', sa.Integer(), nullable=True),
     sa.Column('name', sa.String(length=32), nullable=False),
     sa.Column('lastname', sa.String(length=32), nullable=True),
     sa.Column('email', sa.String(length=255), nullable=True),
@@ -32,7 +30,6 @@ def upgrade() -> None:
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.PrimaryKeyConstraint('id', name=op.f('pk_user')),
-    sa.UniqueConstraint('telegram_id', name=op.f('uq_user_telegram_id')),
     sa.UniqueConstraint('username', name=op.f('uq_user_username'))
     )
     op.create_table('event',

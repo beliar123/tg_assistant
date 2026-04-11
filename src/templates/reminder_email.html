@@ -1,29 +1,141 @@
-<!DOCTYPE html>
-<html lang="ru">
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="ru">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <style>
-    body { margin: 0; padding: 0; background: #f4f4f4; font-family: Arial, sans-serif; }
-    .wrapper { max-width: 480px; margin: 40px auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
-    .header { background: #2AABEE; padding: 28px 32px; text-align: center; }
-    .header h1 { margin: 0; color: #ffffff; font-size: 22px; letter-spacing: 0.5px; }
-    .body { padding: 32px; }
-    .description { font-size: 18px; color: #1a1a1a; line-height: 1.5; margin: 0 0 24px; }
-    .footer { background: #f9f9f9; padding: 16px 32px; text-align: center; color: #999; font-size: 12px; border-top: 1px solid #eee; }
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="format-detection" content="telephone=no, date=no, address=no, email=no" />
+  <title>Напоминание</title>
+  <!--[if mso]>
+  <noscript>
+    <xml>
+      <o:OfficeDocumentSettings>
+        <o:PixelsPerInch>96</o:PixelsPerInch>
+      </o:OfficeDocumentSettings>
+    </xml>
+  </noscript>
+  <![endif]-->
+  <style type="text/css">
+    /* Reset */
+    body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+    table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
+    img { -ms-interpolation-mode: bicubic; border: 0; outline: none; text-decoration: none; }
+
+    /* Client-specific */
+    body { margin: 0 !important; padding: 0 !important; width: 100% !important; }
+    #outlook a { padding: 0; }
+    .ReadMsgBody { width: 100%; }
+    .ExternalClass { width: 100%; }
+    .ExternalClass, .ExternalClass p, .ExternalClass span,
+    .ExternalClass font, .ExternalClass td, .ExternalClass div { line-height: 100%; }
+
+    /* Dark mode */
+    @media (prefers-color-scheme: dark) {
+      .body-bg   { background-color: #1a1a2e !important; }
+      .card      { background-color: #16213e !important; }
+      .text-main { color: #e0e0e0 !important; }
+      .text-sub  { color: #a0a0b0 !important; }
+      .divider   { background-color: #2a2a4a !important; }
+      .footer-bg { background-color: #0f0f1e !important; }
+    }
+
+    /* Responsive */
+    @media only screen and (max-width: 600px) {
+      .wrapper  { width: 100% !important; min-width: 100% !important; }
+      .card     { border-radius: 0 !important; }
+      .pad      { padding: 24px 16px !important; }
+      .pad-top  { padding-top: 20px !important; }
+    }
   </style>
 </head>
-<body>
-  <div class="wrapper">
-    <div class="header">
-      <h1>🔔 Напоминание</h1>
-    </div>
-    <div class="body">
-      <p class="description">{{ description }}</p>
-    </div>
-    <div class="footer">
-      Это автоматическое напоминание от Telegram-бота.
-    </div>
+<body class="body-bg" style="margin:0; padding:0; background-color:#f0f2f5; font-family:Arial,Helvetica,sans-serif;">
+
+  <!-- Preheader (hidden preview text) -->
+  <div style="display:none; max-height:0; overflow:hidden; mso-hide:all;">
+    Напоминание: {{ description }}
+    &nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;
   </div>
+
+  <!-- Outer wrapper -->
+  <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%"
+         style="background-color:#f0f2f5;">
+    <tr>
+      <td align="center" style="padding:32px 16px;">
+
+        <!-- Card -->
+        <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="560"
+               class="wrapper card"
+               style="background-color:#ffffff; border-radius:12px; overflow:hidden;
+                      box-shadow:0 2px 12px rgba(0,0,0,0.08); max-width:560px; width:100%;">
+
+          <!-- Header -->
+          <tr>
+            <td align="center" style="background-color:#2AABEE; padding:28px 32px;">
+              <table role="presentation" border="0" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="padding-right:10px; vertical-align:middle;">
+                    <!--[if !mso]><!-->
+                    <img src="https://em-content.zobj.net/source/microsoft/378/bell_1f514.png"
+                         width="32" height="32" alt="🔔"
+                         style="display:block; width:32px; height:32px;" />
+                    <!--<![endif]-->
+                    <!--[if mso]><span style="font-size:28px;">&#128276;</span><![endif]-->
+                  </td>
+                  <td style="vertical-align:middle;">
+                    <h1 style="margin:0; color:#ffffff; font-size:22px; font-weight:700;
+                               letter-spacing:0.3px; font-family:Arial,Helvetica,sans-serif;">
+                      Напоминание
+                    </h1>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Body -->
+          <tr>
+            <td class="pad text-main" style="padding:32px; color:#1a1a2e;">
+
+              <p style="margin:0 0 8px; font-size:12px; font-weight:700; letter-spacing:1px;
+                         text-transform:uppercase; color:#2AABEE; font-family:Arial,Helvetica,sans-serif;">
+                Событие
+              </p>
+
+              <!-- Divider -->
+              <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                  <td class="divider" style="height:1px; background-color:#e8eaf0;
+                              font-size:0; line-height:0; padding:0 0 20px;">&nbsp;</td>
+                </tr>
+              </table>
+
+              <p class="text-main" style="margin:0; font-size:17px; line-height:1.65;
+                         color:#1a1a2e; font-family:Arial,Helvetica,sans-serif;
+                         word-break:break-word;">
+                {{ description }}
+              </p>
+
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td class="footer-bg text-sub"
+                style="background-color:#f7f8fc; padding:16px 32px;
+                       border-top:1px solid #e8eaf0; text-align:center;">
+              <p class="text-sub" style="margin:0; font-size:12px; color:#8890a4;
+                         font-family:Arial,Helvetica,sans-serif; line-height:1.5;">
+                Это автоматическое напоминание.
+              </p>
+            </td>
+          </tr>
+
+        </table>
+        <!-- /Card -->
+
+      </td>
+    </tr>
+  </table>
+  <!-- /Outer wrapper -->
+
 </body>
 </html>

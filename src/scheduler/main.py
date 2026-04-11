@@ -3,12 +3,15 @@ import logging
 from arq import create_pool, cron
 from arq.connections import RedisSettings
 from pytz import timezone
-from telegram import Bot
 
 from src.configs import settings
 from src.scheduler.tasks import check_events, send_reminder
 
-redis_settings = RedisSettings(host="redis")
+redis_settings = RedisSettings(
+    host=settings.redis.host,
+    port=settings.redis.port,
+    password=settings.redis.password,
+)
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
@@ -16,12 +19,10 @@ logging.basicConfig(
 
 
 async def startup(ctx):
-    ctx["bot"] = Bot(settings.bot.reminder_token)
     ctx["redis"] = await create_pool(redis_settings)
 
 
 async def shutdown(ctx):
-    await ctx["bot"].shutdown()
     await ctx["redis"].aclose()
 
 

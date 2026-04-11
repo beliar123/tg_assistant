@@ -6,7 +6,6 @@ from arq.connections import ArqRedis
 
 from src.core.unitofwork import get_uow
 from src.notifications.email import send_email_reminder
-from src.notifications.telegram import send_telegram_reminder
 from src.scheduler.utils import calculate_next_occurrence
 
 logger = logging.getLogger(__name__)
@@ -16,14 +15,9 @@ async def send_reminder(
     context: dict[str, Any],
     event_id: int,
     message: str,
-    user_tg_id: int | None = None,
     user_email: str | None = None,
 ):
     logger.info("Отправка напоминания %i", event_id)
-    logger.info("Данные клиента %s, %s", user_tg_id, user_email)
-    if user_tg_id:
-        await send_telegram_reminder(context, user_tg_id, message, event_id)
-
     if user_email:
         await send_email_reminder(user_email, message, event_id)
 
@@ -51,13 +45,13 @@ async def check_events(context: dict[str, Any]):
                         "send_reminder",
                         event.id,
                         event.description,
-                        user.telegram_id,
-                        user.email,
+                        user.email if user else None,
                         _job_id=f"reminder_{event.id}_{count}",
                         _defer_until=time_to_send,
                     )
                     logger.info(
-                        f"Напоминание id: {event.id} поставлено в очередь на отправку {time_to_send.date()} в {time_to_send.time()}."
+                        "Напоминание id: %d поставлено в очередь на отправку %s в %s.",
+                        event.id, time_to_send.date(), time_to_send.time(),
                     )
 
                 if event.repeat_interval is None:

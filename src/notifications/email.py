@@ -37,10 +37,8 @@ async def send_email_reminder(to_address: str, description: str, event_id: int) 
             password=cfg.password,
             use_tls=cfg.use_tls,
         )
-        logger.info(f"Email-напоминание id:{event_id} отправлено на {to_address}")
+        logger.info("Email-напоминание id:%d отправлено", event_id)
         return True
     except Exception as e:
-        logger.error(
-            f"Ошибка при отправке email-напоминания id:{event_id} на {to_address}: {e}"
-        )
+        logger.error("Ошибка при отправке email-напоминания id:%d: %s", event_id, e)
         return False

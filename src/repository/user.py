@@ -17,13 +17,3 @@ class UserRepository(BaseRepository[User]):
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def get_user_by_tg_id(self, telegram_id: int) -> Optional[User]:
-        stmt = select(self.model).where(self.model.telegram_id == telegram_id)
-        result = await self.session.execute(stmt)
-        return result.scalar_one_or_none()
-
-    async def get_or_create_user_by_tg_id(self, current_user: User) -> User:
-        user = await self.get_user_by_tg_id(current_user.telegram_id)
-        if not user:
-            user = await self.add(current_user)
-        return user

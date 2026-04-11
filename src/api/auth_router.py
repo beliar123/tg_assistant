@@ -1,6 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from jose import JWTError
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from src.api.auth import (
     create_access_token,
@@ -10,6 +10,7 @@ from src.api.auth import (
     verify_password,
 )
 from src.api.dependencies import get_uow
+from src.api.limiter import limiter
 from src.core.unitofwork import UnitOfWork
 from src.database.models import User
 
@@ -17,15 +18,15 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 class RegisterRequest(BaseModel):
-    username: str
-    password: str
-    name: str
-    lastname: str | None = None
+    username: str = Field(min_length=3, max_length=50)
+    password: str = Field(min_length=8, max_length=128)
+    name: str = Field(min_length=1, max_length=100)
+    lastname: str | None = Field(default=None, max_length=100)
 
 
 class LoginRequest(BaseModel):
-    username: str
-    password: str
+    username: str = Field(max_length=50)
+    password: str = Field(max_length=128)
 
 
 class RefreshRequest(BaseModel):
@@ -39,7 +40,8 @@ class TokenResponse(BaseModel):
 
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
-async def register(data: RegisterRequest, uow: UnitOfWork = Depends(get_uow)):
+@limiter.limit("5/minute")
+async def register(request: Request, data: RegisterRequest, uow: UnitOfWork = Depends(get_uow)):
     existing = await uow.user.get_by_username(data.username)
     if existing:
         raise HTTPException(
@@ -62,7 +64,8 @@ async def register(data: RegisterRequest, uow: UnitOfWork = Depends(get_uow)):
 
 
 @router.post("/token", response_model=TokenResponse)
-async def login(data: LoginRequest, uow: UnitOfWork = Depends(get_uow)):
+@limiter.limit("10/minute")
+async def login(request: Request, data: LoginRequest, uow: UnitOfWork = Depends(get_uow)):
     user = await uow.user.get_by_username(data.username)
     if not user or not verify_password(data.password, user.hashed_password):
         raise HTTPException(
