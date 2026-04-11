@@ -8,6 +8,8 @@ services:
       PGDATA: "/var/lib/postgresql/data/pgdata"
       TZ: "Europe/Moscow"
     restart: "unless-stopped"
+    ports:
+      - 5432:5432
     volumes:
       - tg-assistant-data:/var/lib/postgresql/data
     deploy:
@@ -24,6 +26,8 @@ services:
   redis:
     image: redis:7.4.2-alpine3.21
     restart: "unless-stopped"
+    environment:
+      TZ: "Europe/Moscow"
     volumes:
       - redis-data:/data
     healthcheck:

@@ -44,8 +44,10 @@ class BaseDbModel(DeclarativeBase):
 
 
 class User(BaseDbModel):
-    telegram_id: Mapped[int] = mapped_column(unique=True)
-    chat_id: Mapped[int] = mapped_column()
+    username: Mapped[str] = mapped_column(String(64), unique=True)
+    hashed_password: Mapped[str] = mapped_column(String(255))
+    telegram_id: Mapped[int | None] = mapped_column(unique=True, nullable=True)
+    chat_id: Mapped[int | None] = mapped_column(nullable=True)
     name: Mapped[str] = mapped_column(String(32))
     lastname: Mapped[str | None] = mapped_column(String(32))
     email: Mapped[str | None] = mapped_column(String(255), nullable=True)

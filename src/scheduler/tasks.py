@@ -14,12 +14,15 @@ logger = logging.getLogger(__name__)
 
 async def send_reminder(
     context: dict[str, Any],
-    user_tg_id: int,
     event_id: int,
     message: str,
+    user_tg_id: int | None = None,
     user_email: str | None = None,
 ):
-    await send_telegram_reminder(context, user_tg_id, message, event_id)
+    logger.info("Отправка напоминания %i", event_id)
+    logger.info("Данные клиента %s, %s", user_tg_id, user_email)
+    if user_tg_id:
+        await send_telegram_reminder(context, user_tg_id, message, event_id)
 
     if user_email:
         await send_email_reminder(user_email, message, event_id)
@@ -46,15 +49,15 @@ async def check_events(context: dict[str, Any]):
                     )
                     await redis.enqueue_job(
                         "send_reminder",
-                        user.telegram_id,
                         event.id,
                         event.description,
+                        user.telegram_id,
                         user.email,
                         _job_id=f"reminder_{event.id}_{count}",
                         _defer_until=time_to_send,
                     )
                     logger.info(
-                        f"Напоминание id: {event.id} поставлено в очередь на отправку {time_to_send.date()} в {time_to_send.time()} UTC."
+                        f"Напоминание id: {event.id} поставлено в очередь на отправку {time_to_send.date()} в {time_to_send.time()}."
                     )
 
                 if event.repeat_interval is None:

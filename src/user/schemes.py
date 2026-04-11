@@ -1,12 +1,4 @@
-from pydantic import BaseModel, EmailStr
-
-
-class UserCreateScheme(BaseModel):
-    telegram_id: int
-    chat_id: int
-    name: str
-    lastname: str | None = None
-    email: str | None = None
+from pydantic import BaseModel
 
 
 class UserUpdateScheme(BaseModel):
@@ -18,8 +10,9 @@ class UserUpdateScheme(BaseModel):
 
 class UserScheme(BaseModel):
     id: int
-    telegram_id: int
-    chat_id: int
+    username: str
+    telegram_id: int | None
+    chat_id: int | None
     name: str
     lastname: str | None
     email: str | None

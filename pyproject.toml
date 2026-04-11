@@ -21,6 +21,11 @@ dependencies = [
     "aiosmtplib>=5.1.0",
     "fastapi>=0.135.3",
     "uvicorn>=0.43.0",
+    "ty>=0.0.28",
+    "ruff>=0.15.9",
+    "python-jose[cryptography]>=3.5.0",
+    "passlib[bcrypt]>=1.7.4",
+    "argon2-cffi>=25.1.0",
 ]
 
 [tool.uv]

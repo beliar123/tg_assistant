@@ -42,10 +42,18 @@ class EmailSettings(BaseModel):
     use_tls: bool = True
 
 
+class JWTSettings(BaseModel):
+    secret_key: str
+    algorithm: str = "HS256"
+    access_token_expire_minutes: int = 15
+    refresh_token_expire_days: int = 30
+
+
 class Settings(BaseSettings):
     bot: BotSettings
     database: DatabaseSettings
     email: EmailSettings = EmailSettings()
+    jwt: JWTSettings
 
     model_config = SettingsConfigDict(
         env_file=".env",
