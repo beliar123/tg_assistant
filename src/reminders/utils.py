@@ -30,13 +30,3 @@ def to_msk(dt: datetime) -> str:
 
 def validate_date_time(date_time_str: str) -> bool:
     return parse_date_time(date_time_str) is not None
-
-
-def format_events_or_empty(events: tuple[EventScheme, ...]) -> str:
-    if not events:
-        return render("event_empty.md")
-    return render("event_list.md", events=events, to_msk=to_msk)
-
-
-def format_event_list(events: tuple[EventScheme, ...]) -> str:
-    return render("event_list.md", events=events, to_msk=to_msk)
